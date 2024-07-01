@@ -1,5 +1,5 @@
 import { emit, on, showUI } from '@create-figma-plugin/utilities'
-import { Color, formatHex, formatHex8 } from 'culori'
+import { formatHex8 } from 'culori'
 import { ResizeWindowHandler, GetVariablesHandler, CopyVariablesHandler, CopyToClipboard } from './types'
 
 export default async function () {
@@ -16,21 +16,31 @@ export default async function () {
     width: 240
   })
 
+  async function fetchRemappedVariableCollections() {
+    try {
+      let localVariableCollections = await figma.variables.getLocalVariableCollectionsAsync();
 
-  // Get all local variable collections in the current file
-  let localVariableCollections = figma.variables.getLocalVariableCollections()
-  // let localVariables = figma.variables.getLocalVariables();
-  // include the following properties in the object
-  localVariableCollections = localVariableCollections.map((lvc) => {
-    return {
-      ...lvc,
-      name: lvc.name,
-      id: lvc.id,
-      defaultModeId: lvc.defaultModeId,
-      modes: lvc.modes,
-      variableIds: lvc.variableIds
+      let remappedLocalVariableCollections = localVariableCollections.map((lvc) => {
+        return {
+          ...lvc,
+          name: lvc.name,
+          id: lvc.id,
+          defaultModeId: lvc.defaultModeId,
+          modes: lvc.modes,
+          variableIds: lvc.variableIds
+        };
+      });
+  
+      return remappedLocalVariableCollections;
+    } catch (error) {
+      console.error('Failed to fetch variable collections:', error);
+      return [];
     }
-  });
+  }
+  
+  // Get all local variable collections in the current file
+  let localVariableCollections = await fetchRemappedVariableCollections();
+  emit<GetVariablesHandler>("GET_VARIABLES", localVariableCollections);
 
   let exportedTokens: any = {}
   let notExportedTokens: string[] = [];
@@ -138,7 +148,7 @@ export default async function () {
     //
     // increment the tokenCounter by 1
     tokenCounter++;
-    console.log(`ET token ${tokenCounter} ...`, tokenType, tokenValue);
+    // console.log(`ET token ${tokenCounter} ...`, tokenType, tokenValue);
     let result;
     try {
       switch (tokenType) {
@@ -336,47 +346,47 @@ export default async function () {
   async function getTokenValue(token: Variable, variableCollection: VariableCollection, modeId: string, exportFormat: string, valueFormat: string): Promise<void> {
     // increment the getTokenValueCounter by 1
     getTokenValueCounter++;
-    console.log(`GTV token ${getTokenValueCounter} ...`);
+    // console.log(`GTV token ${getTokenValueCounter} ...`);
     if (getTokenValueCounter === 1) {
-      console.log(token, variableCollection, modeId, exportFormat, valueFormat);
+      // console.log(token, variableCollection, modeId, exportFormat, valueFormat);
     }
     try {
       const collectionId = variableCollection.id;
       if (getTokenValueCounter === 1) {
-        console.log(collectionId);
+        // console.log(collectionId);
       }
       const tokenType = token.resolvedType;
       if (getTokenValueCounter === 1) {
-        console.log(tokenType);
+        // console.log(tokenType);
       }
       const tokenValue = token.valuesByMode[modeId];
       if (getTokenValueCounter === 1) {
-        console.log("tokenValue", tokenValue);
+        // console.log("tokenValue", tokenValue);
       }
       if (getTokenValueCounter === 1) {
-        console.log('(tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS")', (tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS"));
+        // console.log('(tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS")', (tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS"));
       }
       if (tokenValue && (tokenValue as VariableAlias).type === "VARIABLE_ALIAS") {
         if (getTokenValueCounter === 1) {
-          console.log("tokenValue inside conditional", tokenValue);
+          // console.log("tokenValue inside conditional", tokenValue);
         }
         // @ts-ignore
         let variable: Variable | null = null;
-        console.log('Before getVariableByIdAsync');
+        // console.log('Before getVariableByIdAsync');
         try {
           if ((tokenValue as VariableAlias).type === "VARIABLE_ALIAS") { // Check if tokenValue is of type VariableAlias
             const tokenId = (tokenValue as VariableAlias).id;
-            console.log('tokenId', tokenId);
+            // console.log('tokenId', tokenId);
             
             variable = await figma.variables.getVariableByIdAsync(tokenId); // Access id property
-            console.log('After getVariableByIdAsync', variable);
+            // console.log('After getVariableByIdAsync', variable);
           }
         } catch (error) {
           console.error('An error occurred:', error);
         }
-        console.log('After try-catch');
+        // console.log('After try-catch');
         // const variable = tokenValue;
-        console.log("getTokenValueCounter", getTokenValueCounter);
+        // console.log("getTokenValueCounter", getTokenValueCounter);
         if (getTokenValueCounter === 1) {
           // console.log("tokenValue inside conditional", tokenValue);
           console.log("variable:", variable);
@@ -416,6 +426,8 @@ export default async function () {
     }
   }
 
+
+  // TODO: delete this by keeping the object as a JSON.
   function convertToNestedObject(input: string): any {
     if (typeof input !== 'string') {
       throw new Error('Input must be a string');
@@ -463,13 +475,9 @@ export default async function () {
   on<CopyVariablesHandler>(
     'COPY_VARIABLES',
     function (collection: any, mode: any, exportFormat: string, valueFormat: string): void {
-      //console.log(`maint.ts - COPY_VARIABLES - collection, mode: `, collection, mode, exportFormat, valueFormat);
       exportedTokens = {}
       let tokensToExport;
-      if (collection === undefined && mode === undefined) {
-        tokensToExport = figma.variables.getLocalVariables(); // get ALL local variables
-        // console.log(`Processing ${tokensToExport.length} tokens...`)
-      } else if (collection !== undefined && mode !== undefined) {
+      if (!!collection && !!mode) {
         const variableCollection = figma.variables.getVariableCollectionById(collection.id);
         if (variableCollection) {
           tokensToExport = variableCollection.variableIds.map((variableId) => {
@@ -480,7 +488,7 @@ export default async function () {
             // console.log(`Processing token ${index + 1} of ${tokensToExport.length}...`, token, token?.name)
             try {
               if (token) {
-                console.log(`CVH - token ${index + 1}: `, token);
+                // console.log(`CVH - token ${index + 1}: `, token);
                 getTokenValue(token, variableCollection, mode.modeId, exportFormat, valueFormat);
               }
             } catch (error) {
@@ -497,59 +505,48 @@ export default async function () {
 
           // console.log(`Exported ${Object.keys(exportedTokens).length} of ${tokensToExport.length} tokens.`)
         }
+      } else {
+        figma.notify("Please select a collection and mode to export.");
       }
+
       let formattedExportedTokens = JSON.stringify(exportedTokens);
       if (exportFormat === "cssVar" || exportFormat === "camelCase") {
         formattedExportedTokens = ":root " + formattedExportedTokens;
       }
-      formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\":/g, "$1: ").replace(/\"([^(\")"]+)\"/g, "'$1'").replace(/,/g, ";\n  ").replace(/{/g, "{\n  ").replace(/}/g, ";\n}");
-      // console.log(formattedExportedTokens)
+      formattedExportedTokens = formatCSSFromJSON(formattedExportedTokens);
+
+      // TODO: delete this by keeping the object as a JSON.
       if (exportFormat === "dotNotation") {
         formattedExportedTokens = convertToNestedObject(formattedExportedTokens);
         // modify the text formatting of `formattedExportedTokens` to have the proper indentation and new lines of a nested JSON object so that it is readable
-
       }
       emit<CopyToClipboard>('COPY_TO_CLIPBOARD', formattedExportedTokens)
     }
   )
 
+  function formatCSSFromJSON(json: any): string {
+    // Initialize formattedExportedTokens with some JSON-like string
+    let formattedExportedTokens = "...";
 
-  console.clear();
-  // console.log("maint.ts - localVariableCollections: ", localVariableCollections);
-  // console.log("—————————");
+    // Replace quoted keys in JSON (excluding the colon) with unquoted keys
+    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\":/g, "$1: ");
 
-  // let allVariables = figma.variables.getLocalVariables();
-  // allVariables.forEach((variable) => {
-  //   console.log(`maint.ts - variable ${variable.name}: `, variable);
-  // });
+    // Replace double quotes around values with single quotes
+    formattedExportedTokens = formattedExportedTokens.replace(/\"([^(\")"]+)\"/g, "'$1'");
 
-  // localVariableCollections.forEach((variableCollection) => {
-  //   variableCollection.variableIds.forEach((variableId) => {
-  //     const variable = figma.variables.getVariableById(variableId);
-  //     if (variable) {
-  //       console.log(`maint.ts - variable in collection ${variableCollection.name}: `, variable.name, variable);
-  //     }
-  //   });    
-  // });
+    // Replace commas with a semicolon and a newline, adding two spaces for indentation
+    formattedExportedTokens = formattedExportedTokens.replace(/,/g, ";\n  ");
 
-  // let map = loadExistingVariableMap();
-  // console.log("maint.ts - loadExistingVariableMap(): ", map)
+    // Add a newline and two spaces after every opening brace for better readability
+    formattedExportedTokens = formattedExportedTokens.replace(/{/g, "{\n  ");
 
-  // select all the nested child nodes with the layer name "Bottom-Stroke" from the selected nodes so that the selection contains all child nodes with the layer name "Bottom-Stroke"
-  // let allMatchingChildren = [];
+    // Add a semicolon, newline, and closing brace to close scopes neatly
+    formattedExportedTokens = formattedExportedTokens.replace(/}/g, ";\n}");
 
-  // figma.currentPage.selection.forEach((node) => {
-  //   if (node.type === "FRAME" || node.type === "GROUP" || node.type === "COMPONENT" || node.type === "INSTANCE") {
-  //     let children = node.findAll((child) => {
-  //       return child.name === "Bottom-Stroke";
-  //     });
-  //     allMatchingChildren = allMatchingChildren.concat(children);
-  //   }
-  // });
+    return formattedExportedTokens;
+  }  
 
-  // figma.currentPage.selection = allMatchingChildren;
-
-
-  emit<GetVariablesHandler>("GET_VARIABLES", localVariableCollections);
 }
+
+
 
