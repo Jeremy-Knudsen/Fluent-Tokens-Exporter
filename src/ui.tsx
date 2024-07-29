@@ -6,13 +6,13 @@ import {
   DropdownOption,
   Inline,
   Muted,
+  render,
   SegmentedControl,
   SegmentedControlOption,
   Stack,
   Text,
-  VerticalSpace,
-  render,
   useWindowResize,
+  VerticalSpace,
 } from '@create-figma-plugin/ui'
 import {
   IconVariableCollection16,
@@ -21,11 +21,12 @@ import {
 } from './icons'
 import { emit, on } from '@create-figma-plugin/utilities'
 import {
-  ResizeWindowHandler,
-  GetVariablesHandler,
   CopyToClipboard,
-  ProcessVariablesHandler,
   ExportFormat,
+  GetVariablesHandler,
+  MinimizedSetOptions,
+  ProcessVariablesHandler,
+  ResizeWindowHandler,
   ValueFormat,
 } from './types'
 import { JSX, h } from 'preact'
@@ -69,6 +70,11 @@ function Plugin() {
     { value: 'Alias name' },
   ]
 
+  const [minimizedSetOptions, setMinimizedSetOptions] = useState<MinimizedSetOptions>({
+    structureMode: { modeId: '', name: 'Select structure mode' },
+    valueMode: { modeId: '', name: 'Select value mode' }
+  })
+
   function handleValueFormatChange(event: JSX.TargetedEvent<HTMLInputElement>) {
     let asValueFormat: ValueFormat = event.currentTarget.value as ValueFormat
     setValueFormat(asValueFormat)
@@ -107,7 +113,8 @@ function Plugin() {
       selectedCollection,
       selectedMode,
       exportFormat,
-      valueFormat
+      valueFormat,
+      exportFormat === 'minimizedSet' ? minimizedSetOptions : undefined
     )
   }
 
@@ -160,13 +167,36 @@ function Plugin() {
     const newFormat = event.currentTarget.value
     if (isExportFormat(newFormat)) {
       setExportFormat(newFormat)
+      if (newFormat === 'minimizedSet') {
+        // Reset minimized set options when switching to this format
+        setMinimizedSetOptions({
+          structureMode: { modeId: '', name: 'Select structure mode' },
+          valueMode: { modeId: '', name: 'Select value mode' }
+        })
+      }
     } else {
       console.error(`Invalid export format: ${newFormat}`)
     }
   }
 
   function isExportFormat(value: string): value is ExportFormat {
-    return ['cssVar', 'camelCase', 'dotNotation', 'w3c'].includes(value)
+    return ['cssVar', 'camelCase', 'dotNotation', 'w3c', 'minimizedSet'].includes(value)
+  }
+
+  function handleMinimizedSetModeChange(modeType: 'structureMode' | 'valueMode', event: JSX.TargetedEvent<HTMLInputElement>) {
+    const selectedMode = modeOptions.find(option => 
+      isValidDropdownOption(option) && option.value === event.currentTarget.value
+    )
+    if (selectedMode && isValidDropdownOption(selectedMode)) {
+      setMinimizedSetOptions(prev => ({
+        ...prev,
+        [modeType]: { modeId: selectedMode.value, name: selectedMode.value }
+      }))
+    }
+  }
+
+  function isValidDropdownOption(option: DropdownOption | string): option is DropdownOption & { value: string } {
+    return typeof option === 'object' && option !== null && 'value' in option && typeof option.value === 'string';
   }
 
   // 5) Save to clipboard
@@ -224,9 +254,37 @@ function Plugin() {
               { text: '--css-variable-name', value: 'cssVar' },
               { text: 'camelCase', value: 'camelCase' },
               { text: 'JSON', value: 'dotNotation' },
+              { text: 'W3C', value: 'w3c' },
+              { text: 'Minimized Set', value: 'minimizedSet' },
             ]}
             value={exportFormat}
           />
+          {exportFormat === 'minimizedSet' && (
+            <div>
+              <VerticalSpace space="small" />
+              <Text>
+                <Bold>
+                  <Muted>Structure Mode</Muted>
+                </Bold>
+              </Text>
+              <Dropdown
+                onChange={(e) => handleMinimizedSetModeChange('structureMode', e)}
+                options={modeOptions}
+                value={minimizedSetOptions.structureMode.name}
+              />
+              <VerticalSpace space="small" />
+              <Text>
+                <Bold>
+                  <Muted>Value Mode</Muted>
+                </Bold>
+              </Text>
+              <Dropdown
+                onChange={(e) => handleMinimizedSetModeChange('valueMode', e)}
+                options={modeOptions}
+                value={minimizedSetOptions.valueMode.name}
+              />
+            </div>
+          )}
           <SegmentedControl
             onChange={handleValueFormatChange}
             options={valueFormatOptions}

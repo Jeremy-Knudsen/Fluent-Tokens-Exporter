@@ -1,16 +1,18 @@
 import { emit, on, showUI } from '@create-figma-plugin/utilities'
 import {
-  ResizeWindowHandler,
-  GetVariablesHandler,
-  ProcessVariablesHandler,
   CopyToClipboard,
   ExportFormat,
-  ValueFormat,
-  VariableCollection,
+  GetVariablesHandler,
+  MinimizedSetOptions,
   Mode,
+  ProcessVariablesHandler,
+  ResizeWindowHandler,
+  ValueFormat,
   Variable,
+  VariableCollection,
 } from './types'
-import { processTokens } from './mainUtils/processTokens'
+import {  processTokens } from './mainUtils/processTokens'
+import { processMinimizedSet } from './mainUtils/processMinimizedSet'
 
 export default async function () {
   await initializePlugin()
@@ -28,7 +30,7 @@ function setupEventListeners() {
 }
 
 async function showPluginUI() {
-  showUI({ height: 330, width: 240 })
+  showUI({ height: 400, width: 240 })
 }
 
 // Step 1) get local Figma Collections of Variables
@@ -67,7 +69,8 @@ async function ProcessVariables(
   collection: VariableCollection | undefined,
   mode: Mode | undefined,
   exportFormat: ExportFormat,
-  valueFormat: ValueFormat
+  valueFormat: ValueFormat,
+  minimizedSetOptions?: MinimizedSetOptions
 ) {
   if (!collection || !mode) {
     figma.notify('Please select a collection and mode to export.')
@@ -80,7 +83,17 @@ async function ProcessVariables(
     return
   }
 
-  const exportedTokens = await exportVariables(variableCollection, mode, exportFormat, valueFormat)
+  let exportedTokens: Record<string, any>
+
+  if (exportFormat === 'minimizedSet') {
+    if (!minimizedSetOptions || !minimizedSetOptions.structureMode || !minimizedSetOptions.valueMode) {
+      figma.notify('Please select both structure and value modes for minimized set.')
+      return
+    }
+    exportedTokens = await processMinimizedSet(variableCollection, minimizedSetOptions.structureMode, minimizedSetOptions.valueMode)
+  } else {
+    exportedTokens = await exportVariables(variableCollection, mode, exportFormat, valueFormat)
+  }
   
   figma.notify(`Copied ${Object.keys(exportedTokens).length} tokens to clipboard.`)
   

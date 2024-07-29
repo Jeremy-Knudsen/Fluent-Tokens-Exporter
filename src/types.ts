@@ -10,22 +10,28 @@ export interface GetVariablesHandler extends EventHandler {
   handler: (localVariableCollections: VariableCollection[]) => void
 }
 
+export interface CopyToClipboard extends EventHandler {
+  name: 'COPY_TO_CLIPBOARD'
+  handler: (clipboardText: string) => void
+}
+
+export type ExportFormat = 'cssVar' | 'camelCase' | 'dotNotation' | 'w3c' | 'minimizedSet'
+
+export interface MinimizedSetOptions {
+  structureMode: Mode;
+  valueMode: Mode;
+}
+
 export interface ProcessVariablesHandler extends EventHandler {
   name: 'PROCESS_VARIABLES'
   handler: (
     collection: VariableCollection | undefined,
     mode: Mode | undefined,
     exportFormat: ExportFormat,
-    valueFormat: ValueFormat
+    valueFormat: ValueFormat,
+    minimizedSetOptions?: MinimizedSetOptions
   ) => void
 }
-
-export interface CopyToClipboard extends EventHandler {
-  name: 'COPY_TO_CLIPBOARD'
-  handler: (clipboardText: string) => void
-}
-
-export type ExportFormat = 'cssVar' | 'camelCase' | 'dotNotation' | 'w3c'
 
 export type ValueFormat = 'Raw value' | 'Alias name'
 
