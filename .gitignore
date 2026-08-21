@@ -1,0 +1,17 @@
+.DS_Store
+*.log
+*.css.d.ts
+/build/
+/manifest.json
+node_modules/
+
+# added by publish script
+build/
+dist/
+.next/
+.env
+.env.*
+!.env.example
+Thumbs.db
+*-CPC-*
+.git.onedrive-bak/
